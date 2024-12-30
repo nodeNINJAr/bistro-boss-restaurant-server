@@ -31,6 +31,21 @@ async function run() {
     await client.connect();
 
 
+const database = client.db('bistro-boss');
+const dishesCollection = database.collection('dishes');
+const reviewsCollection = database.collection('reviews ');
+
+// get all dish data
+app.get('/dishes', async(req,res)=>{
+    const result = await dishesCollection.find().toArray();
+    res.status(200).send(result)
+})
+
+// get all reviews data
+app.get('/reviews', async(req,res)=>{
+    const result = await reviewsCollection.find().toArray();
+    res.status(200).send(result)
+})
 
 
 
