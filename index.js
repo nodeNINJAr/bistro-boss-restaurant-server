@@ -8,7 +8,12 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 
 
 //middleware
-app.use(cors())
+app.use(cors(
+  {
+    origin: ['http://localhost:5173'],
+    credentials: true,
+  }
+))
 app.use(express.json());
 
 
@@ -34,6 +39,7 @@ async function run() {
 const database = client.db('bistro-boss');
 const dishesCollection = database.collection('dishes');
 const reviewsCollection = database.collection('reviews ');
+const cartDishesCollection = database.collection('cart');
 
 // get all dish data
 app.get('/dishes', async(req,res)=>{
@@ -46,9 +52,20 @@ app.get('/reviews', async(req,res)=>{
     const result = await reviewsCollection.find().toArray();
     res.status(200).send(result)
 })
+// get all cart data
+app.get('/cart', async(req,res)=>{
+    const userEmail = req.query.userEmail;
+    const query = {userEmail}
+    const result = await cartDishesCollection.find(query).toArray();
+    res.status(200).send(result)
+})
 
-
-
+// add to cart
+app.post('/addTocart', async (req,res)=>{
+    const data = req.body;
+    const result = await cartDishesCollection.insertOne(data);
+    res.status(200).send(result)
+})
 
 
 
