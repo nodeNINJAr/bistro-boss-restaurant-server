@@ -92,6 +92,22 @@ app.post('/addusers', async(req ,res)=>{
    res.status(200).send(result);
 } )
 
+// user role update
+app.patch('/users/admin/:id', async(req,res)=>{
+  // 
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id)};
+    const upadateAdmin = {
+        $set : {
+            role : "admin"
+        }
+    }
+    const result = await userCollection.updateOne(filter , upadateAdmin);
+    res.status(200).send(result)
+})
+
+
+
  // item delete from cart
 app.delete('/cart/:id' , async(req,res)=>{
   const id = req.params.id;
