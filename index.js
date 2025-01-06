@@ -66,10 +66,11 @@ const verifyToken = (req,res,next) =>{
 // admin verify
 const verifyAdmin = async(req,res,next)=>{
      
+
     const email = req.user.userinfo;
     const query = {email:email, role:"admin"};
     const admin = await userCollection.findOne(query);
-    console.log(admin,query);
+ 
      if(!admin){
        return res.status(403).send({message:"forbidden access"})  
      }
