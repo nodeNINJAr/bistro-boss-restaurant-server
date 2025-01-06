@@ -61,17 +61,20 @@ app.get('/cart', async(req,res)=>{
     res.status(200).send(result)
 })
 
+// get all users
+app.get('/users', async(req,res)=>{
+    const result = await userCollection.find().toArray();
+    res.send(result)
+})
+
+
+
+
+
 // add to cart
 app.post('/addTocart', async (req,res)=>{
     const data = req.body;
     const result = await cartDishesCollection.insertOne(data);
-    res.status(200).send(result)
-})
-// item delete from cart
-app.delete('/cart/:id' , async(req,res)=>{
-    const id = req.params.id;
-    const query = {_id: new ObjectId(id)};
-    const result = await cartDishesCollection.deleteOne(query);
     res.status(200).send(result)
 })
 
@@ -89,9 +92,21 @@ app.post('/addusers', async(req ,res)=>{
    res.status(200).send(result);
 } )
 
+ // item delete from cart
+app.delete('/cart/:id' , async(req,res)=>{
+  const id = req.params.id;
+  const query = {_id: new ObjectId(id)};
+  const result = await cartDishesCollection.deleteOne(query);
+  res.status(200).send(result)
+})
 
-
-
+// delete user
+app.delete('/users/:id', async(req,res)=>{
+   const id = req.params.id;
+   const query = {_id: new ObjectId(id)};
+   const result = await userCollection.deleteOne(query);
+   res.send(result)
+})
 
 
 
