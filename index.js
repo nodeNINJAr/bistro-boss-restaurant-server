@@ -33,13 +33,14 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
 
 const database = client.db('bistro-boss');
 const dishesCollection = database.collection('dishes');
 const reviewsCollection = database.collection('reviews ');
 const cartDishesCollection = database.collection('cart');
+const userCollection = database.collection('users')
 
 // get all dish data
 app.get('/dishes', async(req,res)=>{
@@ -74,7 +75,19 @@ app.delete('/cart/:id' , async(req,res)=>{
     res.status(200).send(result)
 })
 
+// set user on data base
+app.post('/addusers', async(req ,res)=>{
+   const userData = req.body;
+   const query = {email:userData?.email}
 
+  const isExist = await userCollection.findOne(query)
+    // 
+    if(isExist){
+       return res.send({messsage:"user already available"})
+    }
+   const result = await userCollection.insertOne(userData);
+   res.status(200).send(result);
+} )
 
 
 
