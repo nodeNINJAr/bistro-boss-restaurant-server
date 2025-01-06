@@ -5,6 +5,8 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken');
+
 
 
 //middleware
@@ -12,9 +14,11 @@ app.use(cors(
   {
     origin: ['http://localhost:5173'],
     credentials: true,
+    allowedHeaders: ['Authorization', 'Content-Type']
   }
 ))
 app.use(express.json());
+
 
 
 
@@ -42,6 +46,25 @@ const reviewsCollection = database.collection('reviews ');
 const cartDishesCollection = database.collection('cart');
 const userCollection = database.collection('users')
 
+
+
+// token verify
+const verifyToken = (req,res,next) =>{
+  console.log(req.headers.authorization);
+    if(!req.headers.authorization){
+      return res.status(401).send({message:"Forvidden Access"})
+    }
+  
+    const token = req.headers.authorization.split(" ")[1];
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) =>{
+       if(err){
+        return res.status(401).send({message:"Forvidden Access"}) 
+       }
+       req.user = decoded
+       next();
+    })
+}
+
 // get all dish data
 app.get('/dishes', async(req,res)=>{
     const result = await dishesCollection.find().toArray();
@@ -62,7 +85,9 @@ app.get('/cart', async(req,res)=>{
 })
 
 // get all users
-app.get('/users', async(req,res)=>{
+app.get('/users',verifyToken, async(req,res)=>{
+    const token = req.headers;
+    // console.log(token);
     const result = await userCollection.find().toArray();
     res.send(result)
 })
@@ -124,7 +149,13 @@ app.delete('/users/:id', async(req,res)=>{
    res.send(result)
 })
 
+//jwt sign in
+app.post("/jwt", async(req, res ) =>{
+  const payload = req.body;
+   const token = jwt.sign(payload, process.env.JWT_SECRET , {expiresIn:"5h"});
+   res.send(token)
 
+})
 
 
 
