@@ -50,20 +50,32 @@ const userCollection = database.collection('users')
 
 // token verify
 const verifyToken = (req,res,next) =>{
-  console.log(req.headers.authorization);
     if(!req.headers.authorization){
-      return res.status(401).send({message:"Forvidden Access"})
+      return res.status(401).send({message:"Unauthorized"})
     }
   
     const token = req.headers.authorization.split(" ")[1];
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) =>{
        if(err){
-        return res.status(401).send({message:"Forvidden Access"}) 
+        return res.status(401).send({message:"Unauthorized"}) 
        }
        req.user = decoded
        next();
     })
 }
+// admin verify
+const verifyAdmin = async(req,res,next)=>{
+     
+    const email = req.user.userinfo;
+    const query = {email:email, role:"admin"};
+    const admin = await userCollection.findOne(query);
+    console.log(admin,query);
+     if(!admin){
+       return res.status(403).send({message:"forbidden access"})  
+     }
+   next()
+}
+
 
 // get all dish data
 app.get('/dishes', async(req,res)=>{
@@ -85,14 +97,28 @@ app.get('/cart', async(req,res)=>{
 })
 
 // get all users
-app.get('/users',verifyToken, async(req,res)=>{
-    const token = req.headers;
-    // console.log(token);
+app.get('/users',verifyToken,verifyAdmin, async(req,res)=>{
     const result = await userCollection.find().toArray();
     res.send(result)
 })
 
+// admin check
+app.get('/users/admin/:email',verifyToken, async(req, res)=>{
+     const email = req.params.email;
+    
+     if(email !== req.user.userinfo){
+       return res.status(403).send({message:"Forvidden Access"})  
+     }
+     const query = {email:email}
+     const user = await userCollection.findOne(query);
+     let admin = false;
 
+     if(user){
+         admin = user?.role === "admin"
+     }
+     res.send({admin});
+     
+})
 
 
 
