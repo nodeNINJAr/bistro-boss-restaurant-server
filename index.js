@@ -65,8 +65,7 @@ const verifyToken = (req,res,next) =>{
 }
 // admin verify
 const verifyAdmin = async(req,res,next)=>{
-     
-
+    
     const email = req.user.userinfo;
     const query = {email:email, role:"admin"};
     const admin = await userCollection.findOne(query);
@@ -90,7 +89,7 @@ app.get('/reviews', async(req,res)=>{
     res.status(200).send(result)
 })
 // get all cart data
-app.get('/cart', async(req,res)=>{
+app.get('/cart',verifyToken, async(req,res)=>{
     const userEmail = req.query.userEmail;
     const query = {userEmail}
     const result = await cartDishesCollection.find(query).toArray();
@@ -124,10 +123,19 @@ app.get('/users/admin/:email',verifyToken, async(req, res)=>{
 
 
 // add to cart
-app.post('/addTocart', async (req,res)=>{
+app.post('/addTocart',verifyToken, async (req,res)=>{
     const data = req.body;
     const result = await cartDishesCollection.insertOne(data);
     res.status(200).send(result)
+})
+
+
+// add product to database
+app.post('/menu',verifyToken,verifyAdmin, async (req,res)=>{
+    const menuData = req.body;
+    const result = await dishesCollection.insertOne(menuData);
+    res.status(201).send(result);
+    
 })
 
 // set user on data base
@@ -145,7 +153,7 @@ app.post('/addusers', async(req ,res)=>{
 } )
 
 // user role update
-app.patch('/users/admin/:id', async(req,res)=>{
+app.patch('/users/admin/:id',verifyToken,verifyAdmin, async(req,res)=>{
   // 
     const id = req.params.id;
     const filter = { _id: new ObjectId(id)};
@@ -157,11 +165,28 @@ app.patch('/users/admin/:id', async(req,res)=>{
     const result = await userCollection.updateOne(filter , upadateAdmin);
     res.status(200).send(result)
 })
+//update menu
+app.patch('/menu/:id',verifyToken, verifyAdmin, async(req,res)=>{
+  const id = req.params.id;
+  const recepieData = req.body;
+  const filter ={_id: new ObjectId(id)};
+  const updatedMenu = {
+     $set:{
+          name:recepieData?.name,   
+          category:recepieData?.category,
+          price:recepieData?.price,
+          recipe:recepieData?.recipe,
+          image:recepieData?.image
 
+     }
+  } 
+  const result = await dishesCollection.updateOne(filter, updatedMenu);
+  res.send(result)
+})
 
 
  // item delete from cart
-app.delete('/cart/:id' , async(req,res)=>{
+app.delete('/cart/:id' ,verifyToken, async(req,res)=>{
   const id = req.params.id;
   const query = {_id: new ObjectId(id)};
   const result = await cartDishesCollection.deleteOne(query);
@@ -169,12 +194,23 @@ app.delete('/cart/:id' , async(req,res)=>{
 })
 
 // delete user
-app.delete('/users/:id', async(req,res)=>{
+app.delete('/users/:id',verifyToken,verifyAdmin, async(req,res)=>{
    const id = req.params.id;
    const query = {_id: new ObjectId(id)};
    const result = await userCollection.deleteOne(query);
    res.send(result)
 })
+// delete menu
+app.delete('/menu/:id',verifyToken,verifyAdmin, async(req,res)=>{
+   const id = req.params.id;
+   const query = {_id: new ObjectId(id)};
+   const result = await dishesCollection.deleteOne(query);
+   res.send(result)
+})
+
+
+
+
 
 //jwt sign in
 app.post("/jwt", async(req, res ) =>{
