@@ -118,7 +118,7 @@ app.get('/users',verifyToken,verifyAdmin, async(req,res)=>{
     res.send(result)
 })
 
-// admin check
+// admin check api
 app.get('/users/admin/:email',verifyToken, async(req, res)=>{
      const email = req.params.email;
     
