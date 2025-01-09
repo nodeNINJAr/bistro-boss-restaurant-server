@@ -142,7 +142,7 @@ app.get('/users/admin/:email',verifyToken, async(req, res)=>{
 
 
 
-// stripe secret
+// stripe payment secret 
 app.post('/create-payment-intent', async(req,res)=>{
     const {price} = req.body;
     // stripe calculate money by decimel
