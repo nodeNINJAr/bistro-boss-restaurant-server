@@ -6,7 +6,8 @@ const app = express();
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
-
+// Sign in to see your own test API key embedded in code samples.
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 
 //middleware
@@ -44,6 +45,7 @@ const database = client.db('bistro-boss');
 const dishesCollection = database.collection('dishes');
 const reviewsCollection = database.collection('reviews ');
 const cartDishesCollection = database.collection('cart');
+const transactionCollection = database.collection('transaction');
 const userCollection = database.collection('users')
 
 
@@ -96,6 +98,20 @@ app.get('/cart',verifyToken, async(req,res)=>{
     res.status(200).send(result)
 })
 
+// get payment history
+app.get('/payment-history/:email' ,verifyToken, async(req,res)=>{
+  const email = req.params.email;
+  const userEmail =   req.user.userinfo;
+  if(email !== userEmail){
+     return res.status(403).send({message:"Forbidden Access"})
+  }
+  const filter = {email}
+  const result = await transactionCollection.find(filter).toArray();
+  res.send(result)
+})
+
+
+
 // get all users
 app.get('/users',verifyToken,verifyAdmin, async(req,res)=>{
     const result = await userCollection.find().toArray();
@@ -121,6 +137,45 @@ app.get('/users/admin/:email',verifyToken, async(req, res)=>{
 })
 
 
+
+
+
+
+
+// stripe secret
+app.post('/create-payment-intent', async(req,res)=>{
+    const {price} = req.body;
+    // stripe calculate money by decimel
+    const amount = parseInt(price * 100);
+    // create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+       amount:amount,
+       currency: "usd",
+       payment_method_types:[
+        "card"
+       ]
+    })
+    res.send({
+      clientSecret: paymentIntent.client_secret,
+    })
+})
+//add data to history
+app.post('/transaction' , async(req,res)=>{
+  const payment = req.body;
+  const transResult = await transactionCollection.insertOne(payment);
+  // cart item delete after payment
+  const query = { _id: {
+    $in:payment.cartIds.map(id=> new ObjectId(id))
+  }}
+  const deleteResult = await cartDishesCollection.deleteMany(query)
+  // Send the response as a combined object
+  res.status(200).json({
+    success: true,
+    transactionResult: transResult,
+    deleteResult: deleteResult
+  });
+  
+})
 
 // add to cart
 app.post('/addTocart',verifyToken, async (req,res)=>{
