@@ -13,7 +13,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET);
 //middleware
 app.use(cors(
   {
-    origin: ['http://localhost:5173'],
+    origin: ['http://localhost:5173','https://bristro-boss-bae23.web.app','https://bristro-boss-bae23.firebaseapp.com'],
     credentials: true,
     allowedHeaders: ['Authorization', 'Content-Type']
   }
@@ -110,6 +110,71 @@ app.get('/payment-history/:email' ,verifyToken, async(req,res)=>{
   res.send(result)
 })
 
+// admin stats
+app.get('/admin-stats',verifyToken,verifyAdmin, async(req , res)=>{
+   const customers = await userCollection.estimatedDocumentCount();
+   const products= await dishesCollection.estimatedDocumentCount();
+   const orders = await transactionCollection.estimatedDocumentCount();
+  //  total revenue khoyrati system
+  // const allTransaction = await transactionCollection.find().toArray();
+  // const totalRevenue = allTransaction.reduce((acc, item)=>acc+item.price, 0);
+
+  // best way
+  const revenue = await transactionCollection.aggregate([
+     {
+      $group:{
+         _id:null, // null for finding data from all ids
+         revenue:{
+           $sum:"$price" 
+         }
+      }
+     }
+  ]).toArray();
+  const totalRevenue = revenue[0].revenue || 0;
+  res.send({customers, products , orders,totalRevenue})
+})
+
+//use aggregate pipeline
+app.get('/order-stats',verifyToken,verifyAdmin, async(req,res)=>{
+  const result = await transactionCollection.aggregate([
+     {
+      $unwind:"$dishes_ids"
+     },
+     {
+      $lookup:{
+         from:"dishes",
+         localField:"dishes_ids",
+         foreignField:"_id",
+         as:"dishesitems"
+      },
+     },
+     {
+      $unwind:'$dishesitems'
+     },
+     {
+      $group:{
+        _id:'$dishesitems.category',
+         quantity:{
+          $sum:1,
+         },
+         revenue:{
+           $sum:"$dishesitems.price"
+         }
+      }
+     },
+     {
+      $project:{
+          _id:0,
+          category:'$_id',
+          quantity:'$quantity',
+          revenue:'$revenue'
+      }
+     }
+
+  ]).toArray()
+  res.send(result)
+})
+
 
 
 // get all users
@@ -143,7 +208,7 @@ app.get('/users/admin/:email',verifyToken, async(req, res)=>{
 
 
 // stripe payment secret 
-app.post('/create-payment-intent', async(req,res)=>{
+app.post('/create-payment-intent',verifyToken, async(req,res)=>{
     const {price} = req.body;
     // stripe calculate money by decimel
     const amount = parseInt(price * 100);
@@ -160,7 +225,7 @@ app.post('/create-payment-intent', async(req,res)=>{
     })
 })
 //add data to history
-app.post('/transaction' , async(req,res)=>{
+app.post('/transaction' ,verifyToken, async(req,res)=>{
   const payment = req.body;
   const transResult = await transactionCollection.insertOne(payment);
   // cart item delete after payment
@@ -279,7 +344,7 @@ app.post("/jwt", async(req, res ) =>{
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
