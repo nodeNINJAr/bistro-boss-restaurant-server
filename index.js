@@ -8,6 +8,12 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 // Sign in to see your own test API key embedded in code samples.
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
+// 
+const formData = require('form-data');
+const Mailgun = require('mailgun.js');
+const { default: axios } = require('axios');
+const mailgun = new Mailgun(formData);
+const mg = mailgun.client({username: 'api', key:process.env.MAILGUN_API_KEY});
 
 
 //middleware
@@ -19,12 +25,13 @@ app.use(cors(
   }
 ))
 app.use(express.json());
-
+app.use(express.urlencoded());//important for ssl commerce
 
 
 
 // mongo uri
 const uri = `mongodb+srv://${process.env.USER_DB}:${process.env.USER_PASS}@cluster0.pm9ea.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -47,6 +54,26 @@ const reviewsCollection = database.collection('reviews ');
 const cartDishesCollection = database.collection('cart');
 const transactionCollection = database.collection('transaction');
 const userCollection = database.collection('users')
+
+
+
+// Store ID: nexus6796a83e66816
+// Store Password (API/Secret Key): nexus6796a83e66816@ssl
+
+
+// Merchant Panel URL: https://sandbox.sslcommerz.com/manage/ (Credential as you inputted in the time of registration)
+
+
+ 
+// Store name: testnexusts1w
+// Registered URL: https://bristro-boss-bae23.web.app
+// Session API to generate transaction: https://sandbox.sslcommerz.com/gwprocess/v3/api.php
+// Validation API: https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php?wsdl
+// Validation API (Web Service) name: https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php
+
+
+
+
 
 
 
@@ -204,6 +231,92 @@ app.get('/users/admin/:email',verifyToken, async(req, res)=>{
 
 
 
+// create-ssl-payment
+app.post('/create-ssl-payment',verifyToken, async(req,res)=>{
+  const tranxId = new ObjectId().toString();
+  const payment = req.body;
+  const initiate = {
+    store_id:process.env.STORE_ID,
+    store_passwd:process.env.STORE_PASS,
+    total_amount: payment?.price,
+    currency: 'BDT',
+    tran_id:tranxId, // use unique tran_id for each api call
+    shipping_method: 'Courier',
+    multi_card_name:"mastercard,visacard,amexcard",
+    success_url: process.env.SUCCESS_URL,
+    fail_url:process.env.FAIL_URL,
+    cancel_url:process.env.CANCLE_URL,
+    ipn_url:process.env.IPN_URL,
+    product_name: 'Computer.',
+    product_category: 'Electronic',
+    product_profile: 'general',
+    cus_name: 'Customer Name',
+    cus_email: payment?.email,
+    cus_add1: 'Dhaka',
+    cus_city: 'Dhaka',
+    cus_state: 'Dhaka',
+    cus_postcode: '1000',
+    cus_country: 'Bangladesh',
+    cus_phone: '01711111111',
+    ship_name: 'Customer Name',
+    ship_add1: 'Dhaka',  
+    ship_city: 'Dhaka',
+    ship_state: 'Dhaka',
+    ship_postcode: 1000,
+    ship_country: 'Bangladesh',
+};
+  // 
+  const iniResponse = await axios({
+    url:process.env.INI_API,
+    method:"POST",
+    data:initiate,
+    // 
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+})
+  payment.transactionId=tranxId;
+  // 
+  const response = await transactionCollection.insertOne(payment)
+  //  
+  const gatewayUrl = iniResponse.data?.GatewayPageURL;
+  // 
+  res.send({gatewayUrl})
+ 
+})
+//pay success 
+app.post('/success-payment', async(req,res)=>{
+  const paymentSuccess = req.body;
+  // 
+  //  validation
+  const {data} = await axios.get(`https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php?val_id=${paymentSuccess?.val_id}&store_id=nexus6796a83e66816&store_passwd=nexus6796a83e66816@ssl&format=json`)
+// 
+  if(data?.status !== "VALID"){
+     return res.status(404).send({message:"invalid payment"})
+  }
+  // update status after payment successs
+  const updatePayment = await transactionCollection.updateOne({transactionId:data?.tran_id}, {
+     $set:{ 
+       status:"success"
+     }
+  })
+
+  // cart item delete after payment
+  const payment =  await transactionCollection.findOne({
+    transactionId:data?.tran_id,
+  })
+  // 
+  const query = { _id: {
+    $in:payment.cartIds.map(id=> new ObjectId(id))
+  }}
+  const {deletedCount}= await cartDishesCollection.deleteMany(query);
+  if(deletedCount > 0){
+     res.redirect("https://bristro-boss-bae23.web.app/shop")
+  }
+  // 
+})
+
+
 
 
 
@@ -232,7 +345,27 @@ app.post('/transaction' ,verifyToken, async(req,res)=>{
   const query = { _id: {
     $in:payment.cartIds.map(id=> new ObjectId(id))
   }}
-  const deleteResult = await cartDishesCollection.deleteMany(query)
+  const deleteResult = await cartDishesCollection.deleteMany(query);
+
+//
+mg.messages.create(process.env.MAiL_SAENDING_DOMAIN, {
+  from: "Excited User <mailgun@sandboxaa64ad9dae964ce5a51918c6d50e079e.mailgun.org>",
+  to: ["mehedihasan645356@gmail.com"],
+  subject: "Your Order Success",
+  text: "Hurry up and get ready for end delisious food",
+  html: `
+     <div>
+         <h1>thanks for your order</h1>
+          <h2>Your tansaction id is ${payment?.transactionId} </h2>
+     </div>
+  `
+})
+.then(msg => console.log(msg)) // logs response data
+  .catch(err => console.error(err)); // logs any error
+
+
+
+
   // Send the response as a combined object
   res.status(200).json({
     success: true,
@@ -344,7 +477,7 @@ app.post("/jwt", async(req, res ) =>{
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
